@@ -1,7 +1,11 @@
 import fs from "fs/promises";
 import { walkDirectory } from "./walker.js";
 import { extractMetadata } from "./metadata.js";
-import { shouldIgnore } from "./filter.js";
+import pLimit from "p-limit";
+import { upsertFile } from "../../../data/sqlite/db.js";
+
+const CONCURRENCY_LIMIT = 5; //number of files processed at the same time
+const limit = pLimit(CONCURRENCY_LIMIT);
 
 
 export const runScanner = async () => {
@@ -11,23 +15,27 @@ export const runScanner = async () => {
 
     const results = [];
 
+    const walkOptions = {
+        allowedExtensions: config.allowedExtensions || [],
+        ignoredDirs: config.ignoredDirs || [],
+        ignoredFiles: config.ignoredFiles || [],
+        projectMarkerFiles: config.projectMarkerFiles || [],
+    };
 
     for (const dir of config.allowedPaths) {
         console.log("📂 scanning:", dir);
 
-        const files = await walkDirectory(dir, ["node_modules", ".git"]);
+        const files = await walkDirectory(dir, walkOptions);
 
         console.log("📄", files.length, "files found");
 
-
         const metadataResults = await Promise.all(
-            files
-                .filter(file => !shouldIgnore(file, config.ignored))
-                .map(async (file) => {
-                    const metadata = await extractMetadata(file);
-                    console.log("✅", metadata.name);
-                    return metadata;
-                })
+            files.map((file) => limit(async () => {
+                const metadata = await extractMetadata(file);
+                upsertFile(metadata);
+                console.log("✅", metadata.name);
+                return metadata;
+            }))
         );
 
         results.push(...metadataResults);

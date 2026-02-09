@@ -5,4 +5,4 @@ data/sqlite/*
 dist
 build
 *.log
-.DS_Store
+.DS_Storefilebrain.db

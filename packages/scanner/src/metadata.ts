@@ -10,7 +10,8 @@ export const extractMetadata = async (filePath: string) => {
         name: path.basename(filePath),
         path: filePath,
         size: stat.size,
-        modified: stat.mtime,
-        extension: path.extname(filePath),
+        type: path.extname(filePath),
+        created_at: stat.birthtime.toISOString(),
+        modified_at: stat.mtime.toISOString(),
     }
 }
