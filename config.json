@@ -1,0 +1,14 @@
+{
+    "allowedPaths": [
+        "/home/nathanim/Documents",
+        "/home/nathanim/Downloads",
+        "/home/nathanim/Desktop",
+        "/home/nathanim/projects"
+    ],
+    "ignored": [
+        ".git",
+        ".env",
+        "ssh",
+        "node_modules"
+    ]
+}
