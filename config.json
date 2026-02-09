@@ -2,8 +2,7 @@
     "allowedPaths": [
         "/home/nathanim/Documents",
         "/home/nathanim/Downloads",
-        "/home/nathanim/Desktop",
-        "/home/nathanim/projects"
+        "/home/nathanim/Desktop"
     ],
     "ignored": [
         ".git",

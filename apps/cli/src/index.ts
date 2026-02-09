@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import {Command} from "commander";
-import { handleScan } from "./commands/scan"
-import { handleFind } from "./commands/find"
-import { handleOrganize } from "./commands/organize"
-import { handleAsk } from "./commands/ask"
-import { handleStats } from "./commands/stats"
+import { handleScan } from "./commands/scan.js"
+import { handleFind } from "./commands/find.js"
+import { handleOrganize } from "./commands/organize.js"
+import { handleAsk } from "./commands/ask.js"
+import { handleStats } from "./commands/stats.js"
 
 
 const program = new Command();

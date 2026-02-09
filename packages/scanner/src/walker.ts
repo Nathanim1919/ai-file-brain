@@ -5,21 +5,36 @@ import path from "path";
 
 export const walkDirectory = async (
     dir: string,
-    fileList: string[] = [],
-): Promise<string[]> => {
-    const files = await fs.readdir(dir);
+    ignoredDirs = ["node_modules"]
+) => {
+    let results: string[] = [];
+
+    try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
 
 
-    for (const file of files) {
-        const fullpath = path.join(dir, file);
-        const stat = await fs.stat(fullpath);
+        const tasks = entries.map(async (entry) => {
+            const fullpath = path.join(dir, entry.name);
 
-        if (stat.isDirectory()) {
-            await walkDirectory(fullpath, fileList);
+            const stat = await fs.stat(fullpath);
+
+            if (stat.isDirectory()) {
+                await walkDirectory(fullpath, ignoredDirs);
+            } else {
+                results.push(fullpath);
+            }
+
+        });
+
+        await Promise.all(tasks);
+
+    } catch (err) {
+        if (err.code === "EACCES" || err.code === "ENOENT") {
+            console.warn("⚠️  skipping:", dir, err.code);
         } else {
-            fileList.push(fullpath);
+            throw err;
         }
     }
 
-    return fileList;
+    return results;
 }
