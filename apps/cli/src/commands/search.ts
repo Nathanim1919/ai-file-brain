@@ -1,11 +1,13 @@
 import { parseSearchChArgs } from "../../../../packages/search/search.parser.js";
 import { searchFiles } from "../../../../packages/search/search.service.js";
+import { SearchRepository } from "../../../core/repositories/search.repository.js";
 
+const searchRepository = new SearchRepository();
 
-export const runSearchCommand = (args: string[]) => {
+export async function runSearchCommand(args: string) {
 
-    const query = parseSearchChArgs(args);
-    const results = searchFiles(query);
+    // const query = parseSearchChArgs(args);
+    const results = searchRepository.search(args);
 
 
     for (const file of results) {
