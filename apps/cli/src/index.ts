@@ -6,6 +6,7 @@ import { handleFind } from "./commands/find.js"
 import { handleOrganize } from "./commands/organize.js"
 import { handleAsk } from "./commands/ask.js"
 import { handleStats } from "./commands/stats.js"
+import { runSearchCommand } from "./commands/search.js";
 
 
 const program = new Command();
@@ -22,6 +23,12 @@ program
     .command('scan')
     .description('Scan and index files')
     .action(handleScan);
+
+
+program
+    .command('search <query...>')
+    .description('Search for files')
+    .action(runSearchCommand);
 
 
 program
