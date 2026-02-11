@@ -16,9 +16,10 @@ export async function runSearchCommand(args: string) {
 
         console.log(`📄 ${file.name}`);
         console.log(`📁 ${file.path}`);
-        console.log(`🕒 ${file.modified_at}`);
-        console.log(`📦 ${sizeMB} MB`);
+        console.log(`⭐ score: ${file.score}`);
+        console.log(`🔎 ${file.snippet}`);
         console.log("");
+
 
     }
 
