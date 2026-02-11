@@ -21,13 +21,11 @@ export class SearchRepository {
 
         (-bm25(files_fts, 5.0, 3.0, 1.0, 0.0)) AS score,
 
-        snippet(
-          files_fts,
-          2,
-          '[',
-          ']',
-          '…',
-          10
+        -- Try content snippet first, then name, then path
+        COALESCE(
+          NULLIF(snippet(files_fts, 2, '[', ']', '…', 10), ''),
+          NULLIF(snippet(files_fts, 0, '[', ']', '…', 10), ''),
+          snippet(files_fts, 1, '[', ']', '…', 10)
         ) AS snippet
 
       FROM files_fts
@@ -39,7 +37,6 @@ export class SearchRepository {
         score DESC,
         length(f.name) ASC,
         f.modified_at DESC
-
 
       LIMIT ?
     `);

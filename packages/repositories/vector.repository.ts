@@ -1,5 +1,5 @@
 import * as lancedb from "@lancedb/lancedb";
-import type { Connection, Table } from "@lancedb/lancedb";
+import type { Connection, Table, VectorQuery } from "@lancedb/lancedb";
 
 export interface VectorSearchResult {
     id: string;
@@ -58,12 +58,45 @@ export class VectorRepository {
     async search(queryEmbedding: number[], limit = 10): Promise<VectorSearchResult[]> {
         if (!this.table) throw new Error("VectorRepository not initialized. Call init() first.");
 
-        const results = await this.table
-            .search(queryEmbedding)
+        const results = await (this.table
+            .search(queryEmbedding) as VectorQuery)
             .distanceType("cosine")
             .limit(limit)
             .toArray();
 
         return results as unknown as VectorSearchResult[];
+    }
+
+
+    /**
+     * Drop and recreate the vector table — used by `scan --fresh`.
+     * Destroys all stored embeddings and starts with an empty table.
+     */
+    async reset(): Promise<void> {
+        if (!this.db) throw new Error("VectorRepository not initialized. Call init() first.");
+
+        // Drop existing table if it exists
+        try {
+            await this.db.dropTable(this.TABLE_NAME);
+        } catch {
+            // Table didn't exist — that's fine
+        }
+
+        // Recreate with correct schema
+        this.table = await this.db.createTable(this.TABLE_NAME, [
+            {
+                id: "init",
+                file_id: "",
+                path: "",
+                chunk_index: 0,
+                chunk_text: "",
+                embedding: Array.from(new Float32Array(768)),
+                start_line: 0,
+                end_line: 0,
+                language: "",
+            }
+        ]);
+
+        await this.table.delete("id = 'init'");
     }
 }

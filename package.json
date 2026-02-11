@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "bin": {
+    "ai": "./bin/ai.mjs"
+  },
   "scripts": {
     "dev": "tsx apps/cli/src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -14,8 +17,12 @@
   "dependencies": {
     "@lancedb/lancedb": "^0.26.2",
     "better-sqlite3": "^12.6.2",
+    "chalk": "^5.6.2",
+    "cli-progress": "^3.12.0",
     "commander": "^14.0.3",
+    "log-update": "^7.1.0",
     "mammoth": "^1.11.0",
+    "ora": "^9.3.0",
     "p-limit": "^7.3.0",
     "pdf-parse": "^2.4.5",
     "sqlite3": "^5.1.7",
@@ -24,6 +31,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
     "@types/node": "^25.2.2"
   }
 }
