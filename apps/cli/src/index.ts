@@ -63,12 +63,12 @@ program
             lines.push("");
 
             const commands = [
-                { cmd: "scan",            flags: "[--fresh]",  desc: "Scan and index files with AI embeddings",  icon: "🔎" },
-                { cmd: "search <query>",  flags: "",           desc: "Keyword search (FTS5 full-text)",           icon: "🔍" },
-                { cmd: "find <query>",    flags: "",           desc: "Semantic search (AI-powered vector search)", icon: "✨" },
-                { cmd: "organize <path>", flags: "",           desc: "Organize files in folders",                  icon: "📂" },
-                { cmd: "ask <query>",     flags: "",           desc: "Ask AI about your files",                   icon: "💬" },
-                { cmd: "stats",           flags: "",           desc: "Show index statistics",                     icon: "📊" },
+                { cmd: "scan", flags: "[--fresh]", desc: "Scan and index files with AI embeddings", icon: "🔎" },
+                { cmd: "search <query>", flags: "", desc: "Keyword search (FTS5 full-text)", icon: "🔍" },
+                { cmd: "find <query>", flags: "", desc: "Semantic search (AI-powered vector search)", icon: "✨" },
+                { cmd: "organize <path>", flags: "", desc: "Organize files in folders", icon: "📂" },
+                { cmd: "ask <query>", flags: "", desc: "Ask AI about your files", icon: "💬" },
+                { cmd: "stats", flags: "", desc: "Show index statistics", icon: "📊" },
             ];
 
             for (const c of commands) {

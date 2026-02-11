@@ -64,20 +64,31 @@ export async function extractContent(filePath: string): Promise<string> {
 
 
 async function extractPdf(filePath: string): Promise<string> {
-    const { PDFParse } = await import("pdf-parse");
-    const buffer = await fs.readFile(filePath);
-    const uint8 = new Uint8Array(buffer);
-    const parser = new PDFParse(uint8);
-    await parser.load();
-    const result = await parser.getText();
+    // Silence noisy PDF parser warnings (standardFontDataUrl, TT: undefined function, etc.)
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    console.warn = () => {};
+    console.error = () => {};
 
-    // v2 API returns { pages: [{ text: string }, ...] }
-    if (result && typeof result === "object" && "pages" in result) {
-        const pages = (result as { pages: { text: string }[] }).pages;
-        return pages.map(p => p.text).join("\n");
+    try {
+        const { PDFParse } = await import("pdf-parse");
+        const buffer = await fs.readFile(filePath);
+        const uint8 = new Uint8Array(buffer);
+        const parser = new PDFParse(uint8);
+        await parser.load();
+        const result = await parser.getText();
+
+        // v2 API returns { pages: [{ text: string }, ...] }
+        if (result && typeof result === "object" && "pages" in result) {
+            const pages = (result as { pages: { text: string }[] }).pages;
+            return pages.map(p => p.text).join("\n");
+        }
+
+        return typeof result === "string" ? result : "";
+    } finally {
+        console.warn = originalWarn;
+        console.error = originalError;
     }
-
-    return typeof result === "string" ? result : "";
 }
 
 

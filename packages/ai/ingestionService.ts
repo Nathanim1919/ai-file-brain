@@ -16,11 +16,9 @@ export class IngestionService {
 
     // 2️⃣ embed batch — prepend filename context so embeddings carry file identity
     const fileName = nodePath.basename(path, nodePath.extname(path));
-    const embeddings = await this.embeddingService.embedBarch(
+    const embeddings = await this.embeddingService.embedBatch(
       chunks.map(c => `[File: ${fileName}]\n${c.text}`)
     );
-
-    
 
     // 3️⃣ build rows
     const rows = chunks.map((chunk, i) => ({
