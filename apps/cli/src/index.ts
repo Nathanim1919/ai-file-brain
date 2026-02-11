@@ -32,9 +32,9 @@ program
 
 
 program
-    .command('find <query>')
-    .description('Find files')
-    .action(handleFind);
+    .command('find <query...>')
+    .description('Semantic search for files (AI-powered)')
+    .action((args: string[]) => handleFind(args.join(" ")));
 
 
 program

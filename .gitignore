@@ -1,9 +1,9 @@
 node_modules
 .env
-data/chroma/*
-data/sqlite/*
+data/
 dist
 build
 *.log
 .DS_Store
 filebrain.db
+tables

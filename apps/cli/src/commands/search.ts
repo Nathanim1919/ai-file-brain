@@ -4,10 +4,10 @@ import { SearchRepository } from "../../../core/repositories/search.repository.j
 
 const searchRepository = new SearchRepository();
 
-export async function runSearchCommand(args: string) {
+export async function runSearchCommand(args: string[]) {
 
-    // const query = parseSearchChArgs(args);
-    const results = searchRepository.search(args);
+    const query = args.join(" ");
+    const results = searchRepository.search(query);
 
 
     for (const file of results) {

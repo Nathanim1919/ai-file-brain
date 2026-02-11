@@ -19,7 +19,7 @@ export class SearchRepository {
         f.created_at,
         f.modified_at,
 
-        (-bm25(files_fts)) AS score,
+        (-bm25(files_fts, 5.0, 3.0, 1.0, 0.0)) AS score,
 
         snippet(
           files_fts,
@@ -28,10 +28,7 @@ export class SearchRepository {
           ']',
           '…',
           10
-        ) AS snippet,
-
-        (files_fts.name MATCH ?) AS name_match,
-        (files_fts.path MATCH ?) AS path_match
+        ) AS snippet
 
       FROM files_fts
       JOIN files f ON f.id = files_fts.file_id
@@ -39,18 +36,14 @@ export class SearchRepository {
       WHERE files_fts MATCH ?
 
       ORDER BY
-        name_match DESC,
-        path_match DESC,
-        score DESC
+        score DESC,
+        length(f.name) ASC,
+        f.modified_at DESC
+
 
       LIMIT ?
     `);
 
-    return stmt.all(
-      match,
-      match,
-      match,
-      limit
-    );
+    return stmt.all(match, limit);
   }
 }
