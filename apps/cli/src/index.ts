@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
+import { handleSetup } from "./commands/setup.js";
 import { handleScan } from "./commands/scan.js";
 import { handleFind } from "./commands/find.js";
 import { handleOrganize } from "./commands/organize.js";
@@ -63,6 +64,7 @@ program
             lines.push("");
 
             const commands = [
+                { cmd: "setup", flags: "", desc: "First-time setup wizard (install Ollama, pull models)", icon: "🚀" },
                 { cmd: "scan", flags: "[--fresh]", desc: "Scan and index files with AI embeddings", icon: "🔎" },
                 { cmd: "search <query>", flags: "", desc: "Keyword search (FTS5 full-text)", icon: "🔍" },
                 { cmd: "find <query>", flags: "", desc: "Semantic search (AI-powered vector search)", icon: "✨" },
@@ -92,6 +94,12 @@ program
             return lines.join("\n");
         },
     });
+
+
+program
+    .command("setup")
+    .description("First-time setup wizard")
+    .action(handleSetup);
 
 
 program

@@ -69,6 +69,23 @@ export class VectorRepository {
 
 
     /**
+     * Count total rows in the vector table.
+     */
+    async countRows(): Promise<number> {
+        if (!this.table) throw new Error("VectorRepository not initialized. Call init() first.");
+        return this.table.countRows();
+    }
+
+    /**
+     * Get all rows (for stats aggregation). Use with care on large tables.
+     */
+    async getAllRows(): Promise<{ file_id: string; path: string; chunk_index: number }[]> {
+        if (!this.table) throw new Error("VectorRepository not initialized. Call init() first.");
+        const rows = await this.table.query().select(["file_id", "path", "chunk_index"]).toArray();
+        return rows as unknown as { file_id: string; path: string; chunk_index: number }[];
+    }
+
+    /**
      * Drop and recreate the vector table — used by `scan --fresh`.
      * Destroys all stored embeddings and starts with an empty table.
      */
