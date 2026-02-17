@@ -75,7 +75,7 @@ async function extractPdf(filePath: string): Promise<string> {
         const buffer = await fs.readFile(filePath);
         const uint8 = new Uint8Array(buffer);
         const parser = new PDFParse(uint8);
-        await parser.load();
+        await (parser as any).load();
         const result = await parser.getText();
 
         // v2 API returns { pages: [{ text: string }, ...] }

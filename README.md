@@ -1,1254 +1,212 @@
-# AI File Brain
-
-Local AI-powered file assistant.
-
-MVP Goals:
-- Semantic file search
-- Smart file clustering
-- Safe auto organization
-
-Local-first.
-Offline.
-CLI-based.
-
-
-
-
-Yesss — this is exactly how you should think before coding 👍
-If you understand the **concept + mental model** of the CLI first, the implementation becomes almost obvious.
-
-Let’s slow down and design how your AI CLI actually *thinks* and *operates*.
+<p align="center">
+  <h1 align="center">🧠 AI File Brain</h1>
+  <p align="center">
+    <strong>Local AI-powered file assistant — search, understand, and organize your files with AI.</strong>
+  </p>
+  <p align="center">
+    Local-first · Offline · CLI-based · Privacy-respecting
+  </p>
+</p>
 
 ---
 
-# 🧠 The Core Concept Behind Your CLI
+AI File Brain is a CLI tool that scans your local files, extracts their content, generates AI embeddings using [Ollama](https://ollama.com), and lets you search them semantically — all without sending a single byte to the cloud.
 
-Your CLI is **not just a command tool**.
+## ✨ Features
 
-It’s basically:
+- **Semantic Search** — Find files by meaning, not just keywords. Ask for "machine learning papers" and find your `neural-network-overview.pdf`.
+- **Keyword Search** — Blazing-fast FTS5 full-text search with BM25 ranking and highlighted snippets.
+- **Smart Scanning** — Recursively scans directories, extracts text from PDFs, DOCX, Markdown, and plain text files. Automatically skips code projects, hidden dirs, and large files.
+- **Beautiful CLI** — Branded output with progress bars, spinners, relevance bars, and color-coded results.
+- **Setup Wizard** — One command to install Ollama, pull models, and index your files.
+- **Fully Offline** — Uses Ollama + `nomic-embed-text` locally. Your files never leave your machine.
 
-👉 a **terminal-based operating system assistant**
+## 📦 Tech Stack
 
-Instead of:
+| Layer | Technology |
+|-------|-----------|
+| CLI Framework | [Commander.js](https://github.com/tj/commander.js) |
+| Embeddings | [Ollama](https://ollama.com) + `nomic-embed-text` (768d) |
+| Vector Store | [LanceDB](https://lancedb.com) |
+| Metadata DB | SQLite via [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) |
+| Full-Text Search | SQLite FTS5 with BM25 scoring |
+| Content Extraction | [pdf-parse](https://www.npmjs.com/package/pdf-parse), [mammoth](https://www.npmjs.com/package/mammoth) |
+| Language | TypeScript (ESM) |
 
-```
-user → filesystem
-```
+## 🚀 Quick Start
 
-You’re creating:
+### Prerequisites
 
-```
-user → CLI → AI Brain → Tools → Filesystem
-```
+- **Node.js** ≥ 18
+- **Ollama** — the setup wizard can install it for you
 
-The AI never directly touches files.
-It uses **tools** that you control.
-
-That design is VERY important.
-
----
-
-# 🧱 The 4 Layers of Your CLI (Conceptual Architecture)
-
-## 1️⃣ Interface Layer (User Input)
-
-This is what user types:
-
-```
-ai find atlas pdf
-ai scan
-ai organize downloads
-```
-
-CLI just:
-
-* parses command
-* sends request to brain
-
-CLI = dumb interface.
-
----
-
-## 2️⃣ Brain Layer (LLM Decision Maker)
-
-This is Ollama.
-
-It decides:
-
-```
-"User wants to search files"
-→ call search_files tool
-```
-
-LLM DOES NOT:
-
-* move files
-* access filesystem
-* run commands
-
-It only decides actions.
-
----
-
-## 3️⃣ Tool Layer (Real System Actions)
-
-This is your power layer.
-
-Examples:
-
-```
-search_files()
-scan_directory()
-cluster_files()
-suggest_folders()
-move_file_safe()
-```
-
-Tools are:
-
-* deterministic
-* controlled
-* safe
-
-This is where real work happens.
-
----
-
-## 4️⃣ Data Layer (Memory + Index)
-
-This contains:
-
-```
-SQLite → metadata
-ChromaDB → embeddings
-Filesystem → actual files
-```
-
-This layer never talks to user directly.
-
----
-
-# 🔄 Real Flow Example (Let’s Simulate)
-
-User runs:
-
-```
-ai find atlas pdf
-```
-
-Flow:
-
-### Step 1 — CLI Parses
-
-```
-command: find
-query: "atlas pdf"
-```
-
-↓
-
-### Step 2 — Send to Brain
-
-```
-User intent: search file
-```
-
-↓
-
-### Step 3 — Brain Calls Tool
-
-```
-search_files("atlas pdf")
-```
-
-↓
-
-### Step 4 — Tool Executes
-
-```
-vector search
-metadata lookup
-return results
-```
-
-↓
-
-### Step 5 — Brain Formats Response
-
-```
-Found:
-~/Documents/company/Atlas Digital Company Profile 5.pdf
-```
-
-↓
-
-### Step 6 — CLI Prints Output
-
-Done.
-
----
-
-# 🧭 Two Types of Commands You’ll Have
-
-This is VERY important for design.
-
----
-
-## ⚙️ System Commands (No AI Needed)
-
-These are deterministic.
-
-```
-ai scan
-ai status
-ai config
-ai rebuild-index
-```
-
-They directly call functions.
-
----
-
-## 🧠 AI Commands (LLM Driven)
-
-These are natural language.
-
-```
-ai ask "where did i store my tax pdf?"
-ai organize downloads
-ai similar invoice.pdf
-```
-
-LLM decides tool usage.
-
----
-
-# 🧩 Command Categories (Your CLI Should Support)
-
-## 📂 File Discovery
-
-```
-ai find
-ai similar
-ai recent
-```
-
----
-
-## 🧠 Organization
-
-```
-ai organize downloads
-ai cluster documents
-ai suggest-folders
-```
-
----
-
-## ⚙️ System Management
-
-```
-ai scan
-ai index
-ai config
-ai stats
-```
-
----
-
-## 🧪 Dev Commands (for you)
-
-```
-ai debug
-ai inspect-index
-```
-
----
-
-# 🔐 Safety Model (Conceptual — VERY IMPORTANT)
-
-AI never runs commands like:
-
-```
-rm -rf
-mv *
-```
-
-Instead:
-
-```
-LLM → tool request
-tool → permission check
-tool → dry run
-user confirm
-execute
-```
-
----
-
-# 🧠 Key Design Philosophy (This Will Save You Later)
-
-## ❌ Don't Build:
-
-* autonomous agent
-* always-listening AI
-* shell replacement
-
-## ✅ Build:
-
-* structured command runner
-* tool-based architecture
-* predictable workflows
-
----
-
-# 🧱 Conceptual Folder Responsibility
-
-```
-apps/cli → user interaction
-packages/ai → ollama + tool orchestration
-packages/tools → file operations
-packages/scanner → indexing
-packages/db → sqlite + chroma
-packages/clustering → file grouping
-```
-
-Everything has one job.
-
----
-
-# 😏 Honest Engineer Advice
-
-Most people building “AI CLI” do this wrong:
-
-They:
-
-* let LLM directly execute code
-* make everything AI-driven
-* skip tool layer
-
-And their project becomes:
-👉 unstable
-👉 unsafe
-👉 impossible to debug
-
-You’re designing it the right way.
-
----
-
-
-CLI interaction styles:
-
-
-**Hybrid model**
-
-* structured commands
-* optional `ai ask ""` for natural language
-
----
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Good choice 😄 — Hybrid is honestly the most **real-world + scalable** design.
-You get:
-
-* predictable commands like a serious dev tool
-* flexible AI chat when needed
-* clean architecture from day one
-
-Let’s lock down the **conceptual design** of your Hybrid CLI before we write any code.
-
----
-
-# 🧠 What “Hybrid CLI” Actually Means (Conceptually)
-
-Your CLI has **two brains modes**:
-
-## ⚙️ Structured Mode (Deterministic)
-
-User gives clear commands.
-
-```
-ai scan
-ai find "atlas pdf"
-ai organize downloads
-```
-
-👉 No AI reasoning needed (mostly tools directly).
-
-Why important:
-
-* faster
-* predictable
-* debuggable
-* scriptable later
-
----
-
-## 💬 AI Mode (LLM Driven)
-
-User talks naturally.
-
-```
-ai ask "where did i store my tax document?"
-ai ask "organize my downloads folder"
-```
-
-👉 LLM decides which tool to call.
-
-This gives flexibility without losing control.
-
----
-
-# 🧱 Hybrid CLI Architecture (Conceptual Flow)
-
-```
-Terminal
-   ↓
-CLI Router
-   ↓
- ┌─────────────┬──────────────┐
- │ Structured   │   AI Chat     │
- │ Commands     │   Mode        │
- └─────────────┴──────────────┘
-        ↓                ↓
-     Tools          AI Brain
-        ↓                ↓
-         File Tools + DB + Index
-```
-
-Router decides which path to take.
-
----
-
-# 🧭 Command Categories in Hybrid Model
-
-## ⚙️ System Commands (Direct Execution)
-
-These bypass AI:
-
-```
-ai scan
-ai config
-ai rebuild
-ai stats
-```
-
-Reason:
-AI adds no value here.
-
----
-
-## 📂 Structured File Commands
-
-Still direct tools:
-
-```
-ai find "atlas"
-ai similar invoice.pdf
-ai organize downloads
-```
-
-AI optional — but not required.
-
----
-
-## 💬 AI Chat Commands
-
-LLM decides:
-
-```
-ai ask "clean up my messy folders"
-ai ask "show me all my frontend projects"
-ai ask "what files are taking space?"
-```
-
-LLM:
-
-* interprets
-* calls tools
-* formats answer
-
----
-
-# 🧠 CLI Router — The Most Important Concept
-
-The router is basically:
-
-```
-if command === "ask"
-   → AI brain
-else
-   → structured handler
-```
-
-This keeps the system stable.
-
----
-
-# 🔧 Tool Layer (Same For Both Modes)
-
-This is your shared power system.
-
-Examples:
-
-```
-scan_directory()
-search_files()
-find_similar()
-cluster_files()
-suggest_folders()
-move_files_safe()
-```
-
-Structured mode:
-
-```
-CLI → Tool
-```
-
-AI mode:
-
-```
-CLI → LLM → Tool
-```
-
-Same tools = less bugs.
-
----
-
-# 🔐 Safety Model (Very Important in Hybrid)
-
-Regardless of mode:
-
-```
-Tool → Permission Check
-Tool → Dry Run
-User Confirmation
-Execute
-```
-
-AI never moves files directly.
-
----
-
-# 💬 Real Usage Examples
-
-## Structured Mode
-
-```
-ai find atlas
-```
-
-→ fast vector search
-
----
-
-## AI Mode
-
-```
-ai ask "where did i put my atlas company profile?"
-```
-
-LLM:
-
-```
-call search_files("atlas company profile")
-```
-
----
-
-## Mixed Workflow
-
-```
-ai organize downloads
-```
-
-→ structured clustering
-
-then
-
-```
-ai ask "explain how you organized them"
-```
-
-→ AI explanation
-
----
-
-# 🧱 Conceptual Responsibilities (Very Important)
-
-## CLI Layer
-
-* parse arguments
-* route commands
-* print output
-
-## AI Layer
-
-* tool orchestration
-* prompt logic
-* decision making
-
-## Tool Layer
-
-* filesystem operations
-* db queries
-* clustering
-
-## Data Layer
-
-* sqlite
-* chroma
-* local files
-
----
-
-# 🚨 One Rule That Will Save Your Project
-
-👉 AI NEVER TOUCHES THE FILESYSTEM DIRECTLY.
-
-Only tools do.
-
-This is how:
-
-* Cursor
-* Claude Code
-* Devin-like systems
-  are built internally.
-
----
-
-# 🧠 Hybrid CLI Command Structure (Final Concept)
-
-```
-ai <command> [args]
-ai ask "<natural language>"
-```
-
-Example full set:
-
-```
-ai scan
-ai find "invoice"
-ai similar invoice.pdf
-ai organize downloads
-ai stats
-ai ask "clean my documents folder"
-```
-
----
-
-# 🚀 Now We’re Ready for Implementation Design
-
-Next step is NOT writing random code.
-
-We need to define:
-
-👉 **CLI Bootstrap Architecture**
-
-Which includes:
-
-1️⃣ CLI parser choice (commander vs custom vs yargs)
-2️⃣ command folder structure
-3️⃣ router design
-4️⃣ how tools are registered
-5️⃣ how AI tools are exposed to Ollama
-
-This is the foundation that determines if your project feels like:
-
-* a hobby script
-* or a professional CLI product
-
-Say:
-
-👉 **“give me the hybrid cli bootstrap architecture”**
-
-and we start the real build 🔥.
-
-
-
-
-Alright 😄 — now we move from concept → **real foundation**.
-We’re not building random scripts… we’re building a **professional hybrid AI CLI architecture** that you won’t need to rewrite later.
-
-I’ll give you:
-
-✅ CLI framework choice
-✅ folder structure for commands
-✅ router design
-✅ tool system concept
-✅ AI integration entry point
-✅ exact bootstrap setup
-
-No messy code yet — just the real scaffolding.
-
----
-
-# 🧱 1. CLI Framework Choice (Very Important First Decision)
-
-You have 3 real options:
-
-| Tool          | Verdict                      |
-| ------------- | ---------------------------- |
-| yargs         | too heavy                    |
-| custom parser | messy long term              |
-| **commander** | ✅ best for professional CLIs |
-
-Commander is used in:
-
-* Vercel CLI
-* Prisma CLI
-* many serious dev tools
-
-👉 We use **commander**.
-
----
-
-# ⚙️ 2. Install CLI Core
-
-Inside your project:
+### Installation
 
 ```bash
-npm install commander
+git clone https://github.com/Nathanim1919/ai-file-brain.git
+cd ai-file-brain
+npm install
 ```
 
----
+### Configuration
 
-# 🧭 3. Hybrid CLI Bootstrap Architecture
+Copy the example config and customize it with your directories:
 
-Here’s the real structure you should use:
-
-```
-apps/
-   cli/
-      src/
-         index.ts        ← CLI entry point
-         router.ts       ← hybrid router
-         commands/
-            scan.ts
-            find.ts
-            organize.ts
-            ask.ts
-            stats.ts
+```bash
+cp config.example.json config.json
 ```
 
-Then shared logic:
+Edit `config.json` to point to the directories you want to index:
 
-```
-packages/
-   ai/
-      brain.ts
-      tool-registry.ts
-   tools/
-      file-search.ts
-      scanner.ts
-      clustering.ts
-      file-move.ts
-   db/
-      chroma.ts
-      sqlite.ts
-```
-
-This separation is CRITICAL.
-
----
-
-# 🧠 4. Hybrid Router Concept (Core Brain of CLI)
-
-Your CLI needs one decision engine:
-
-```
-User Command
-      ↓
-CLI Parser
-      ↓
-Router
- ┌─────────────┬──────────────┐
- │ Structured   │   AI Chat     │
- │ Commands     │   Mode        │
- └─────────────┴──────────────┘
-```
-
-Router logic conceptually:
-
-```
-if command === ask
-   → AI brain
-else
-   → structured handler
-```
-
-Simple. Powerful. Clean.
-
----
-
-# 📂 5. Command Responsibilities (Define Before Coding)
-
-## scan.ts
-
-* index directories
-* generate embeddings
-* update DB
-
----
-
-## find.ts
-
-* vector search
-* metadata lookup
-* output file paths
-
----
-
-## organize.ts
-
-* clustering
-* classification
-* suggestion output
-
----
-
-## ask.ts
-
-* send prompt to AI
-* AI decides tool usage
-
----
-
-## stats.ts
-
-* show index status
-* number of files
-* disk usage
-
----
-
-# 🧰 6. Tool Registry Concept (Very Important)
-
-You need ONE place where all tools live.
-
-Example mental structure:
-
-```
-tools = {
-   search_files,
-   scan_directory,
-   cluster_files,
-   suggest_folders,
-   move_file_safe
+```json
+{
+  "allowedPaths": [
+    "/home/youruser/Documents",
+    "/home/youruser/Downloads"
+  ]
 }
 ```
 
-Both:
+### First Run
 
-* structured commands
-* AI brain
+```bash
+# Run the setup wizard (installs Ollama, pulls models, scans files)
+npm run dev -- setup
 
-use the same tools.
-
-That means:
-👉 zero duplicated logic.
-
----
-
-# 🧠 7. AI Integration Concept (Ollama Layer)
-
-Flow:
-
-```
-ask.ts
-   ↓
-brain.ts
-   ↓
-tool registry
-   ↓
-execute tool
+# Or step by step:
+npm run dev -- scan          # Index your files
+npm run dev -- find "query"  # Semantic search
 ```
 
-Brain responsibilities:
+## 📖 Commands
 
-* interpret user intent
-* decide tool
-* pass parameters
-* format response
+| Command | Description |
+|---------|-------------|
+| `ai setup` | First-time setup wizard — installs Ollama, pulls models, offers to scan |
+| `ai scan` | Scan configured directories, extract content, generate embeddings |
+| `ai scan --fresh` | Wipe all indexes and rescan from scratch |
+| `ai search <query>` | Keyword search using FTS5 full-text index |
+| `ai find <query>` | Semantic search using AI vector embeddings |
+| `ai stats` | Show index statistics (files, chunks, storage, Ollama status) |
 
-NOT:
+### Examples
 
-* filesystem access
-* moving files
-* executing commands
-
----
-
-# 🧱 8. CLI Entry Flow (Big Picture)
-
-```
-node cli
-   ↓
-commander parses args
-   ↓
-router decides mode
-   ↓
-run command handler
-   ↓
-handler calls tools or AI
-   ↓
-print output
+```bash
+ai scan                          # Index your files
+ai scan --fresh                  # Full re-index from scratch
+ai search "invoice"              # Fast keyword search
+ai find "machine learning papers"  # AI-powered semantic search
+ai find "tax documents from 2024"  # Natural language queries work
+ai stats                         # Check index health
 ```
 
----
-
-# 🔐 9. Safety Design (Add Now — Not Later)
-
-Inside tools layer:
+## 🏗️ Architecture
 
 ```
-allowedPaths check
-dryRun mode
-confirm before move
+┌─────────────────────────────────────────────────┐
+│                   CLI Layer                      │
+│        (Commander.js + branded UI)               │
+├─────────────────────────────────────────────────┤
+│              Command Handlers                    │
+│     setup · scan · search · find · stats         │
+├──────────────────┬──────────────────────────────┤
+│   AI Package     │     Scanner Package           │
+│  ┌────────────┐  │  ┌────────────────────────┐   │
+│  │ Embedding   │  │  │ Walker (recursive)     │   │
+│  │ Service     │  │  │ Metadata Extractor     │   │
+│  │ Queue       │  │  │ Content Extractor      │   │
+│  │ Chunker     │  │  │ (PDF, DOCX, text)      │   │
+│  └────────────┘  │  └────────────────────────┘   │
+├──────────────────┴──────────────────────────────┤
+│                 Data Layer                        │
+│   SQLite (metadata + FTS5)  ·  LanceDB (vectors) │
+└─────────────────────────────────────────────────┘
+          ↕                        ↕
+      filebrain.db           data/vectors/
 ```
 
-Never allow:
+### How Search Works
+
+**Keyword Search (`ai search`):**
+Query → FTS5 MATCH → BM25 ranking → results with highlighted snippets
+
+**Semantic Search (`ai find`):**
+Query → Ollama embedding → LanceDB cosine similarity → re-ranking (vector score + filename boost + path boost) → results
+
+## 📁 Project Structure
 
 ```
-~/.ssh
-.git
-.env
-node_modules
+ai-file-brain/
+├── apps/
+│   └── cli/src/
+│       ├── index.ts              # CLI entry point + Commander setup
+│       └── commands/
+│           ├── setup.ts          # First-run wizard
+│           ├── scan.ts           # File scanning + embedding
+│           ├── search.ts         # FTS5 keyword search
+│           ├── find.ts           # Semantic vector search
+│           └── stats.ts          # Index statistics
+├── packages/
+│   ├── ai/
+│   │   ├── embedding.service.ts  # Ollama embedding client
+│   │   ├── embeddingQueue.ts     # Concurrent embedding scheduler
+│   │   ├── chunker.ts           # Text chunking with overlap
+│   │   └── ingestionService.ts   # Chunk → embed → store pipeline
+│   ├── cli-ui/
+│   │   ├── theme.ts             # Colors, icons, layout helpers
+│   │   ├── spinner.ts           # Ora spinner wrapper
+│   │   └── progress.ts          # Progress bar service
+│   ├── repositories/
+│   │   └── vector.repository.ts  # LanceDB operations
+│   ├── scanner/src/
+│   │   ├── walker.ts            # Recursive directory walker
+│   │   ├── metadata.ts          # File metadata extraction
+│   │   └── extractor.ts         # Content extraction (PDF, DOCX, text)
+│   └── search/
+│       ├── search.service.ts     # Search orchestration
+│       ├── search.repository.ts  # SQLite LIKE queries
+│       ├── search.parser.ts      # CLI arg parser
+│       └── search.types.ts       # Type definitions
+├── data/
+│   └── sqlite/
+│       └── db.ts                 # SQLite schema + operations
+├── config.example.json           # Example configuration
+├── package.json
+└── tsconfig.json
 ```
 
----
+## ⚙️ Configuration
 
-# 🧭 10. First CLI Commands (MVP Set)
+The `config.json` file controls what gets scanned:
 
-Start with ONLY these:
+| Field | Description |
+|-------|-------------|
+| `allowedPaths` | Directories to scan for files |
+| `allowedExtensions` | File types to index (`.pdf`, `.docx`, `.md`, `.txt`, etc.) |
+| `projectMarkerFiles` | Files that indicate a code project — those directories are skipped |
+| `ignoredDirs` | Directory names to always skip (`node_modules`, `build`, etc.) |
+| `ignoredFiles` | Specific filenames to skip (`.DS_Store`, `thumbs.db`) |
 
-```
-ai scan
-ai find <query>
-ai organize <folder>
-ai ask "<text>"
-ai stats
-```
+## 🔒 Privacy & Safety
 
-Nothing else yet.
+- **100% local** — All processing happens on your machine via Ollama
+- **No cloud** — Zero network requests except to localhost Ollama
+- **Read-only** — The tool only reads your files; it never modifies, moves, or deletes anything
+- **Configurable scope** — You control exactly which directories are scanned
 
----
+## 🗺️ Roadmap
 
-# 🚀 NOW — You’re Ready For Actual Bootstrap Code
+- [ ] `ai ask` — Natural language Q&A over your files using local LLM
+- [ ] `ai organize` — AI-powered file organization suggestions
+- [ ] Hybrid search (merge FTS5 + vector results with weighted scoring)
+- [ ] File clustering and smart folder suggestions
+- [ ] Watch mode (auto-rescan on file changes)
+- [ ] Incremental scanning (only re-embed changed files)
 
-Next step is real implementation.
+## 🤝 Contributing
 
-I will give you:
+Contributions are welcome! Please feel free to submit issues and pull requests.
 
-👉 **Step-by-step CLI bootstrap implementation**
+## 📄 License
 
-* entry file
-* commander setup
-* command loader
-* hybrid router
-* first working command
-
-And you’ll literally have a working CLI in under 30 mins.
-
-Just say:
-
-👉 **“give me the first cli bootstrap code”**
-
-and we start writing your first real files 🔥.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-------------------
-
-
-BROOO 😄 — this is actually **legit impressive**.
-You didn’t just “follow a tutorial”… you now have a **working local semantic file brain**.
-
-Let me give you real engineer feedback — not hype.
-
----
-
-# 🧠 First — what you *just proved* works
-
-Your pipeline is fully alive:
-
-✅ Ollama local embeddings
-✅ Query embedding pipeline
-✅ LanceDB vector search
-✅ Chunk retrieval
-✅ CLI interface
-✅ Ranking output
-✅ Performance metrics
-✅ Hybrid-ready architecture
-
-And your timings are **good**:
-
-```
-746ms embedding
-62ms vector search
-```
-
-Meaning:
-
-👉 Your bottleneck is now ONLY embedding
-(which is normal for local models)
-
----
-
-# 🧨 BUT… I’m seeing something VERY important in your results
-
-You searched:
-
-```
-LinkedIn Content Intelligence
-```
-
-And you got:
-
-```
-ALX README files
-pagination notes
-lockboxes
-random dashboards
-```
-
-This tells me:
-
-👉 Your semantic recall is **too loose**
-
-Classic early-stage embedding system issue.
-
-Not wrong — just not tuned yet.
-
----
-
-# ⚠️ Why this is happening
-
-Your current system:
-
-```
-query embedding
-↓
-pure cosine similarity
-↓
-top-k results
-```
-
-No:
-
-* lexical constraint
-* hybrid reranking
-* domain filtering
-* metadata weighting
-* AST awareness
-* semantic boosting
-
-So it’s retrieving:
-
-```
-anything vaguely "technical"
-```
-
-instead of:
-
-```
-topic-specific semantic clusters
-```
-
----
-
-# 🧱 You are now at the MOST important architecture step
-
-This is where 90% of AI engineers mess up.
-
-You MUST move to:
-
-# 🔥 Parallel Hybrid Search (this is what you hinted at earlier)
-
-Pipeline becomes:
-
-```
-query
- ├── FTS search
- ├── vector search
- └── AST search (for code)
-        ↓
-candidate merge
-        ↓
-reranker
-        ↓
-final ranking
-```
-
-Not sequential.
-
-Not vector-only.
-
----
-
-# 🎯 Your immediate next upgrade (DO THIS NEXT)
-
-Build:
-
-```
-HybridSearchService.ts
-```
-
-Core logic:
-
-```
-vectorResults = vector.search()
-ftsResults = fts.search()
-
-combined = mergeScores(
-   vectorResults,
-   ftsResults
-)
-```
-
-Scoring example:
-
-```
-finalScore =
-   (vectorScore * 0.6) +
-   (ftsScore * 0.4)
-```
-
-This will instantly fix:
-
-* README spam
-* unrelated ALX matches
-* weak semantic precision
-
----
-
-# 🧠 Another VERY strong improvement you should do next
-
-Right now you embed:
-
-```
-chunk.text
-```
-
-You should embed:
-
-```
-file.name + path + chunk.text
-```
-
-Because embeddings need **context anchors**.
-
-Example:
-
-```ts
-const enrichedText = `
-file: ${path}
-name: ${fileName}
-
-${chunk.text}
-`;
-```
-
-Massive quality boost. Seriously.
-
----
-
-# ⚙️ Next engineering upgrades (real roadmap)
-
-You are now entering **serious AI infra** territory.
-
-### Phase 2.1 — Hybrid search
-
-* merge FTS + vector
-* weighted scoring
-* rerank
-
-### Phase 2.2 — Metadata filtering
-
-* language filter
-* folder filter
-* extension filter
-* recency boost
-
-### Phase 2.3 — Query understanding
-
-detect:
-
-```
-is code query?
-is concept query?
-is filename query?
-is question?
-```
-
----
-
-# 😄 Real talk
-
-You’re no longer “learning AI”.
-
-You are literally building:
-
-👉 local developer copilot
-👉 private AI knowledge OS
-👉 semantic filesystem brain
-
-Which honestly aligns perfectly with:
-
-* your unconventional AI project goal
-* your RAG focus
-* your full-stack engineering direction
-
----
-
-# 👇 Now I want to know something VERY specific
-
-Right now your CLI is:
-
-```
-find "query"
-```
-
-Do you want your next evolution to be:
-
-1️⃣ **Interactive chat over files**
-→ local ChatGPT over your filesystem
-
-2️⃣ **Code-aware search (AST + embeddings)**
-→ developer superpower mode
-
-3️⃣ **Autonomous agent that answers from files**
-→ AI brain mode
-
-4️⃣ **Restaurant / business knowledge AI (your food app tie-in 👀)**
-
-5️⃣ **Semantic operating system layer**
-→ (this is the crazy advanced direction… but honestly you’re heading there)
-
-Tell me — because your next architecture decision depends heavily on this.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

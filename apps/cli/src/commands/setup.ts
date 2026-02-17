@@ -17,6 +17,7 @@ import {
     icons, line, summaryBox,
     spin,
 } from "../../../../packages/cli-ui/index.js";
+import { isOllamaRunning, getInstalledModelNames } from "../../../../packages/ai/ollama.js";
 import { handleScan } from "./scan.js";
 
 // ─── Required Ollama models ────────────────────────────────
@@ -47,28 +48,6 @@ function commandExists(cmd: string): boolean {
         return true;
     } catch {
         return false;
-    }
-}
-
-/** Check if Ollama server is running by pinging it. */
-async function isOllamaRunning(): Promise<boolean> {
-    try {
-        const res = await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(3000) });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
-/** Get list of installed Ollama models. */
-async function getInstalledModels(): Promise<string[]> {
-    try {
-        const res = await fetch("http://localhost:11434/api/tags");
-        if (!res.ok) return [];
-        const data = await res.json() as { models?: { name: string }[] };
-        return (data.models ?? []).map((m) => m.name.split(":")[0]!);
-    } catch {
-        return [];
     }
 }
 
@@ -217,7 +196,7 @@ export const handleSetup = async () => {
     // ═══════════════════════════════════════════════════════════
     step("Checking required AI models...\n");
 
-    const installedModels = await getInstalledModels();
+    const installedModels = await getInstalledModelNames();
 
     for (const model of REQUIRED_MODELS) {
         const isInstalled = installedModels.includes(model.name);

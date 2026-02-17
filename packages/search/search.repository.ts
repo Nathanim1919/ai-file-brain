@@ -1,4 +1,4 @@
-import { db } from "../../data/sqlite/db.js";
+import { db } from "../db/index.js";
 import type { SearchQuery, SearchResult } from "./search.types.js";
 
 
@@ -43,5 +43,5 @@ export const runSearchQuery = (query: SearchQuery): SearchResult[] => {
 
     sql += ` ORDER BY modified_at DESC LIMIT 50`;
 
-    return db.prepare(sql).all(params);
+    return db.prepare(sql).all(params) as SearchResult[];
 }

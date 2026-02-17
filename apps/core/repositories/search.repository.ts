@@ -1,4 +1,4 @@
-import { db } from "../../../data/sqlite/db.js";
+import { db } from "../../../packages/db/index.js";
 
 export class SearchRepository {
 

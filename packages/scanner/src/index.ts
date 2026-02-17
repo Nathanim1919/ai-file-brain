@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import { walkDirectory } from "./walker.js";
 import { extractMetadata } from "./metadata.js";
 import pLimit from "p-limit";
-import { db, upsertFile } from "../../../data/sqlite/db.js";
+import { db, upsertFile } from "../../db/index.js";
 import type { IngestionService } from "../../ai/ingestionService.js";
 
 const SCAN_CONCURRENCY = 10;   // IO-bound: read files + extract metadata

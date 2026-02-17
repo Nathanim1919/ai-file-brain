@@ -3,7 +3,7 @@ import { EmbeddingService } from "../../../../packages/ai/embedding.service.js";
 import { EmbeddingQueue } from "../../../../packages/ai/embeddingQueue.js";
 import { VectorRepository } from "../../../../packages/repositories/vector.repository.js";
 import { chunkText } from "../../../../packages/ai/chunker.js";
-import { clearAllFiles } from "../../../../data/sqlite/db.js";
+import { clearAllFiles } from "../../../../packages/db/index.js";
 import {
     banner, brand, accent, success, warning, error, dim, muted, highlight,
     icons, line, summaryBox, sectionHeader,

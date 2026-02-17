@@ -1,8 +1,8 @@
 {
     "allowedPaths": [
-        "/home/nathanim/Documents",
-        "/home/nathanim/Downloads",
-        "/home/nathanim/Desktop"
+        "~/Documents",
+        "~/Downloads",
+        "~/Desktop"
     ],
     "allowedExtensions": [
         ".pdf",

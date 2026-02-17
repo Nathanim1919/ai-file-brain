@@ -7,7 +7,7 @@
  *   - Ollama: running status, models installed
  */
 
-import { db } from "../../../../data/sqlite/db.js";
+import { db } from "../../../../packages/db/index.js";
 import { VectorRepository } from "../../../../packages/repositories/vector.repository.js";
 import path from "path";
 import {
@@ -15,6 +15,7 @@ import {
     icons, line, summaryBox, sectionHeader,
     spin,
 } from "../../../../packages/cli-ui/index.js";
+import { isOllamaRunning, getInstalledModels } from "../../../../packages/ai/ollama.js";
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -23,26 +24,6 @@ function formatBytes(bytes: number): string {
     const units = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
-}
-
-async function isOllamaRunning(): Promise<boolean> {
-    try {
-        const res = await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(3000) });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
-async function getInstalledModels(): Promise<{ name: string; size: number }[]> {
-    try {
-        const res = await fetch("http://localhost:11434/api/tags");
-        if (!res.ok) return [];
-        const data = await res.json() as { models?: { name: string; size: number }[] };
-        return (data.models ?? []).map((m) => ({ name: m.name, size: m.size }));
-    } catch {
-        return [];
-    }
 }
 
 
