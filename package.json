@@ -1,13 +1,14 @@
 {
   "name": "ai-file-brain",
   "version": "0.1.0",
-  "description": "Local AI-powered file assistant \u2014 search, understand, and organize your files with semantic embeddings. Fully offline, privacy-first.",
+  "description": "Local AI-powered file assistant — search, understand, and organize your files with semantic embeddings. Fully offline, privacy-first.",
   "main": "index.js",
   "bin": {
     "ai": "./bin/ai.mjs"
   },
   "scripts": {
     "dev": "tsx apps/cli/src/index.ts",
+    "dev:api": "tsx apps/api/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -35,12 +36,14 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "@lancedb/lancedb": "^0.26.2",
     "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
     "cli-progress": "^3.12.0",
     "commander": "^14.0.3",
     "dotenv": "^8.2.0",
+    "hono": "^4.12.8",
     "log-update": "^7.1.0",
     "mammoth": "^1.11.0",
     "node-fetch": "^3.3.2",
