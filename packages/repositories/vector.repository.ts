@@ -1,5 +1,6 @@
 import * as lancedb from "@lancedb/lancedb";
 import type { Connection, Table, VectorQuery } from "@lancedb/lancedb";
+import { VECTORS_DIR } from "../paths.js";
 
 export interface VectorSearchResult {
     id: string;
@@ -20,7 +21,7 @@ export class VectorRepository {
 
 
     async init() {
-        this.db = await lancedb.connect("./data/vectors");
+        this.db = await lancedb.connect(VECTORS_DIR);
 
         try {
             this.table = await this.db.openTable(this.TABLE_NAME);
@@ -83,6 +84,20 @@ export class VectorRepository {
         if (!this.table) throw new Error("VectorRepository not initialized. Call init() first.");
         const rows = await this.table.query().select(["file_id", "path", "chunk_index"]).toArray();
         return rows as unknown as { file_id: string; path: string; chunk_index: number }[];
+    }
+
+    /**
+     * Delete all vector chunks belonging to a specific file.
+     * Used when a file changes (delete old vectors, then re-embed).
+     */
+    async deleteByFileId(fileId: string): Promise<void> {
+        if (!this.table) throw new Error("VectorRepository not initialized. Call init() first.");
+        try {
+            await this.table.delete(`file_id = '${fileId}'`);
+        } catch {
+            // Row may not exist — that's fine
+            console.error(`Row with file_id ${fileId} not found in vector table.`);
+        }
     }
 
     /**

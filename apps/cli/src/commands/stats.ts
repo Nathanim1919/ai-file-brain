@@ -9,6 +9,7 @@
 
 import { db } from "../../../../packages/db/index.js";
 import { VectorRepository } from "../../../../packages/repositories/vector.repository.js";
+import { DB_PATH, VECTORS_DIR } from "../../../../packages/paths.js";
 import path from "path";
 import {
     banner, brand, accent, success, warning, error as errorStyle, dim, muted, highlight,
@@ -178,11 +179,11 @@ export const handleStats = async () => {
     try {
         const fs = await import("fs");
 
-        const sqliteSize = fs.existsSync("filebrain.db")
-            ? fs.statSync("filebrain.db").size : 0;
+        const sqliteSize = fs.existsSync(DB_PATH)
+            ? fs.statSync(DB_PATH).size : 0;
 
         let vectorSize = 0;
-        const vectorDir = "./data/vectors";
+        const vectorDir = VECTORS_DIR;
         if (fs.existsSync(vectorDir)) {
             const getSize = (dir: string): number => {
                 let total = 0;

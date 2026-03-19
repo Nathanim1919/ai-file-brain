@@ -125,6 +125,39 @@ ai stats                         # Check index health
       filebrain.db           data/vectors/
 ```
 
+graph TB
+    subgraph tauri_app [Tauri Desktop App]
+        subgraph frontend [Svelte Frontend]
+            SearchUI[Search Bar + Results]
+            ScanUI[Scan Manager]
+            StatsUI[Stats Dashboard]
+            SettingsUI[Settings / Folder Picker]
+        end
+        
+        subgraph rust_shell [Rust Shell]
+            WindowMgr[Window Manager]
+            Lifecycle[App Lifecycle]
+            Sidecar[Sidecar Launcher]
+        end
+    end
+    
+    subgraph ts_backend [TypeScript API Server]
+        API[Express/Hono API]
+        Scanner[Scanner Package]
+        EmbeddingQ[Embedding Queue]
+        VectorRepo[LanceDB Vectors]
+        SQLiteDB[SQLite + FTS5]
+        OllamaClient[Ollama Client]
+    end
+    
+    subgraph ollama [Ollama]
+        EmbedModel[nomic-embed-text]
+    end
+    
+    frontend -->|"HTTP/fetch"| API
+    Sidecar -->|"spawns"| ts_backend
+    OllamaClient --> ollama
+
 ### How Search Works
 
 **Keyword Search (`ai search`):**

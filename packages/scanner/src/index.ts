@@ -2,37 +2,49 @@ import fs from "fs/promises";
 import { walkDirectory } from "./walker.js";
 import { extractMetadata } from "./metadata.js";
 import pLimit from "p-limit";
-import { db, upsertFile } from "../../db/index.js";
+import {
+    db, upsertFile, buildContentHash, getStoredHash,
+    getAllTrackedPaths, deleteFileByPath, backfillHash,
+} from "../../db/index.js";
+import { CONFIG_PATH } from "../../paths.js";
 import type { IngestionService } from "../../ai/ingestionService.js";
 
-const SCAN_CONCURRENCY = 10;   // IO-bound: read files + extract metadata
-const EMBED_CONCURRENCY = 3;   // GPU-bound: Ollama batch embedding
+const SCAN_CONCURRENCY = 10;
 
 // ─── Event callbacks the CLI layer can subscribe to ────────
 export interface ScanCallbacks {
-    // Phase 1: Discovery
     onDiscoveryStart?: (dir: string) => void;
     onDiscoveryEnd?: (dir: string, fileCount: number) => void;
 
-    // Phase 1: Scanning (metadata extraction + SQLite)
     onFileScanned?: (name: string, index: number, total: number) => void;
-    onScanPhaseComplete?: (totalFiles: number) => void;
+    onFileSkipped?: (name: string) => void;
+    onScanPhaseComplete?: (stats: ScanPhaseStats) => void;
 
-    // Phase 2: Embedding
     onEmbedPhaseStart?: (totalFiles: number) => void;
     onFileEmbedded?: (name: string, index: number, total: number, chunkCount: number) => void;
     onEmbedError?: (name: string, error: string) => void;
     onEmbedPhaseComplete?: (embeddedFiles: number, errors: number) => void;
 
-    // Overall
+    onDeletedDetected?: (count: number) => void;
+
     onComplete?: (stats: ScanStats) => void;
 }
 
+export interface ScanPhaseStats {
+    newFiles: number;
+    changedFiles: number;
+    unchangedFiles: number;
+    totalEmbeddable: number;
+}
+
 export interface ScanStats {
-    totalFiles: number;
-    scannedFiles: number;
+    totalDiscovered: number;
+    newFiles: number;
+    changedFiles: number;
+    unchangedFiles: number;
+    deletedFiles: number;
+    embeddableFiles: number;
     embeddedFiles: number;
-    skippedFiles: number;
     errors: number;
     durationMs: number;
     scanDurationMs: number;
@@ -48,9 +60,12 @@ export interface ScannedFile {
     type: string;
 }
 
+export type FileChangeStatus = "new" | "changed" | "unchanged";
+
 interface ScanOptions {
     ingestionService?: IngestionService;
     callbacks?: ScanCallbacks;
+    fresh?: boolean;
 }
 
 export const runScanner = async (options: ScanOptions = {}) => {
@@ -58,7 +73,7 @@ export const runScanner = async (options: ScanOptions = {}) => {
     const cb = options.callbacks ?? {};
 
     const config = JSON.parse(
-        await fs.readFile("config.json", "utf-8")
+        await fs.readFile(CONFIG_PATH, "utf-8")
     );
 
     const walkOptions = {
@@ -69,11 +84,16 @@ export const runScanner = async (options: ScanOptions = {}) => {
     };
 
     // ═══════════════════════════════════════════════════════════
-    //  PHASE 1: Discovery + Metadata Extraction + SQLite Storage
+    //  PHASE 1: Discovery + Change Detection + Metadata
     // ═══════════════════════════════════════════════════════════
     const scanStart = Date.now();
     const scanLimit = pLimit(SCAN_CONCURRENCY);
     const scannedFiles: ScannedFile[] = [];
+    const discoveredPaths = new Set<string>();
+
+    let newCount = 0;
+    let changedCount = 0;
+    let unchangedCount = 0;
 
     for (const dir of config.allowedPaths) {
         cb.onDiscoveryStart?.(dir);
@@ -84,17 +104,51 @@ export const runScanner = async (options: ScanOptions = {}) => {
         const total = files.length;
         let processed = 0;
 
-        const metadataResults = await Promise.all(
+        await Promise.all(
             files.map((file) => scanLimit(async () => {
-                const metadata = await extractMetadata(file);
-                upsertFile(metadata);
+                discoveredPaths.add(file);
+
+                const stat = await fs.stat(file);
+                const currentHash = buildContentHash(stat.size, stat.mtime.toISOString());
+                const storedHash = options.fresh ? null : getStoredHash(file);
+
+                let status: FileChangeStatus;
+                if (storedHash === null) {
+                    status = "new";
+                    newCount++;
+                } else if (storedHash === "" || storedHash === currentHash) {
+                    // Empty hash = migrated from before incremental scanning.
+                    // Same hash = file hasn't changed.
+                    // Either way, backfill the hash and skip re-embedding.
+                    status = "unchanged";
+                    unchangedCount++;
+                } else {
+                    status = "changed";
+                    changedCount++;
+                }
 
                 processed++;
+
+                if (status === "unchanged") {
+                    // Backfill hash for migrated rows that have empty content_hash
+                    if (storedHash === "") {
+                        backfillHash(file, currentHash);
+                    }
+                    cb.onFileSkipped?.(file);
+                    cb.onFileScanned?.(file, processed, total);
+                    return;
+                }
+
+                // File is new or changed — extract metadata + content
+                const metadata = await extractMetadata(file);
+                const metadataWithHash = { ...metadata, content_hash: currentHash };
+                upsertFile(metadataWithHash);
+
                 cb.onFileScanned?.(metadata.name, processed, total);
 
-                // Collect files that have extractable content for Phase 2
                 if (metadata.content.length > 0) {
-                    const row = db.prepare("SELECT id FROM FILES WHERE path = ?").get(metadata.path) as { id: number } | undefined;
+                    const row = db.prepare("SELECT id FROM files WHERE path = ?").get(metadata.path) as
+                        { id: number } | undefined;
                     const fileId = row ? String(row.id) : metadata.path;
 
                     scannedFiles.push({
@@ -106,17 +160,43 @@ export const runScanner = async (options: ScanOptions = {}) => {
                         type: metadata.type,
                     });
                 }
-
-                return metadata;
             }))
         );
     }
 
     const scanDurationMs = Date.now() - scanStart;
-    cb.onScanPhaseComplete?.(scannedFiles.length);
+
+    cb.onScanPhaseComplete?.({
+        newFiles: newCount,
+        changedFiles: changedCount,
+        unchangedFiles: unchangedCount,
+        totalEmbeddable: scannedFiles.length,
+    });
 
     // ═══════════════════════════════════════════════════════════
-    //  PHASE 2: Embedding (independent, resumable, throttled)
+    //  PHASE 1.5: Detect & clean up deleted files
+    // ═══════════════════════════════════════════════════════════
+    let deletedCount = 0;
+    const deletedFileIds: string[] = [];
+
+    if (!options.fresh) {
+        const trackedPaths = getAllTrackedPaths();
+
+        for (const trackedPath of trackedPaths) {
+            if (!discoveredPaths.has(trackedPath)) {
+                const deletedId = deleteFileByPath(trackedPath);
+                if (deletedId) deletedFileIds.push(deletedId);
+                deletedCount++;
+            }
+        }
+
+        if (deletedCount > 0) {
+            cb.onDeletedDetected?.(deletedCount);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PHASE 2: Embedding (only new + changed files)
     // ═══════════════════════════════════════════════════════════
     const embedStart = Date.now();
     let embeddedCount = 0;
@@ -125,7 +205,7 @@ export const runScanner = async (options: ScanOptions = {}) => {
     if (options.ingestionService && scannedFiles.length > 0) {
         cb.onEmbedPhaseStart?.(scannedFiles.length);
 
-        const embedLimit = pLimit(EMBED_CONCURRENCY);
+        const embedLimit = pLimit(3);
         const total = scannedFiles.length;
 
         await Promise.all(
@@ -154,10 +234,13 @@ export const runScanner = async (options: ScanOptions = {}) => {
     //  Summary
     // ═══════════════════════════════════════════════════════════
     const stats: ScanStats = {
-        totalFiles: scannedFiles.length,
-        scannedFiles: scannedFiles.length,
+        totalDiscovered: discoveredPaths.size,
+        newFiles: newCount,
+        changedFiles: changedCount,
+        unchangedFiles: unchangedCount,
+        deletedFiles: deletedCount,
+        embeddableFiles: scannedFiles.length,
         embeddedFiles: embeddedCount,
-        skippedFiles: scannedFiles.length - embeddedCount - errorCount,
         errors: errorCount,
         durationMs: Date.now() - totalStart,
         scanDurationMs,
@@ -166,5 +249,5 @@ export const runScanner = async (options: ScanOptions = {}) => {
 
     cb.onComplete?.(stats);
 
-    return scannedFiles;
+    return { scannedFiles, deletedFileIds, stats };
 };

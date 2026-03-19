@@ -9,7 +9,7 @@ import {
     icons, line, summaryBox, sectionHeader,
     spin, ProgressBar,
 } from "../../../../packages/cli-ui/index.js";
-import type { ScanCallbacks, ScanStats } from "../../../../packages/scanner/src/index.js";
+import type { ScanCallbacks, ScanPhaseStats } from "../../../../packages/scanner/src/index.js";
 
 interface ScanFlags {
     fresh?: boolean;
@@ -37,10 +37,11 @@ export const handleScan = async (flags: ScanFlags = {}) => {
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  PHASE 1: Discovery + Metadata Scan
+    //  PHASE 1: Discovery + Change Detection + Metadata
     // ═══════════════════════════════════════════════════════════
     let scanProgress: ProgressBar | null = null;
     let totalDiscovered = 0;
+    let phaseStats: ScanPhaseStats | undefined;
 
     const callbacks: ScanCallbacks = {
         onDiscoveryStart(dir) {
@@ -61,19 +62,62 @@ export const handleScan = async (flags: ScanFlags = {}) => {
             scanProgress?.increment();
         },
 
-        onScanPhaseComplete(totalFiles) {
-            console.log(`\n  ${icons.check} ${success("Scan phase complete")} — ${highlight(String(totalFiles))} ${muted("files with embeddable content")}`);
+        onScanPhaseComplete(stats) {
+            phaseStats = stats;
+
+            console.log(`\n  ${icons.check} ${success("Scan phase complete")}`);
+
+            if (stats.unchangedFiles > 0) {
+                console.log(`  ${icons.skip} ${muted(`${stats.unchangedFiles} unchanged files skipped`)}`);
+            }
+            if (stats.newFiles > 0) {
+                console.log(`  ${icons.sparkle} ${accent(`${stats.newFiles} new`)} ${muted("files detected")}`);
+            }
+            if (stats.changedFiles > 0) {
+                console.log(`  ${icons.bolt} ${accent(`${stats.changedFiles} changed`)} ${muted("files detected")}`);
+            }
+            if (stats.totalEmbeddable > 0) {
+                console.log(`  ${icons.embed} ${highlight(String(stats.totalEmbeddable))} ${muted("files to embed")}`);
+            }
+        },
+
+        onDeletedDetected(count) {
+            console.log(`  ${icons.warn} ${warning(`${count} deleted`)} ${muted("files cleaned up from index")}`);
         },
     };
 
     const scanStart = Date.now();
 
-    // Run Phase 1 only (no ingestionService passed — just scan + SQLite)
-    const scannedFiles = await runScanner({ callbacks });
+    const { scannedFiles, deletedFileIds } = await runScanner({
+        callbacks,
+        ...(flags.fresh != null ? { fresh: flags.fresh } : {}),
+    });
+
     const scanDuration = ((Date.now() - scanStart) / 1000).toFixed(1);
 
+    // ─── Clean up vectors for deleted files ───────────────────
+    if (deletedFileIds.length > 0) {
+        const deleteSpinner = spin(`Removing vectors for ${deletedFileIds.length} deleted files...`);
+        for (const fid of deletedFileIds) {
+            await vectorRepo.deleteByFileId(fid);
+        }
+        deleteSpinner.succeed(`Cleaned up vectors for ${deletedFileIds.length} deleted files`);
+    }
+
+    // ─── Nothing to embed? ────────────────────────────────────
     if (scannedFiles.length === 0) {
-        console.log(`\n  ${icons.warn} ${warning("No embeddable files found.")} Check your config.json paths.`);
+        if (phaseStats && phaseStats.unchangedFiles > 0) {
+            console.log(`\n  ${icons.check} ${success("Everything is up to date!")} ${dim("No files need re-embedding.")}`);
+        } else {
+            console.log(`\n  ${icons.warn} ${warning("No embeddable files found.")} Check your config at ${accent("~/.ai-file-brain/config.json")}`);
+        }
+
+        summaryBox([
+            { label: "Files discovered:", value: totalDiscovered,                icon: icons.file },
+            { label: "Unchanged:",        value: phaseStats?.unchangedFiles ?? 0, icon: icons.skip },
+            { label: "Deleted:",          value: deletedFileIds.length,           icon: icons.warn },
+            { label: "Scan time:",        value: `${scanDuration}s`,             icon: icons.clock },
+        ]);
         return;
     }
 
@@ -81,6 +125,19 @@ export const handleScan = async (flags: ScanFlags = {}) => {
     //  PHASE 2: AI Embedding (via EmbeddingQueue)
     // ═══════════════════════════════════════════════════════════
     console.log(`\n  ${icons.embed} ${highlight("Embedding Phase")} ${dim("— sending chunks to Ollama")}`);
+
+    // Clean up old vectors for changed files before re-embedding
+    const changedFiles = scannedFiles.filter(f => {
+        return phaseStats && phaseStats.changedFiles > 0;
+    });
+
+    if (phaseStats && phaseStats.changedFiles > 0) {
+        const cleanSpinner = spin("Removing old vectors for changed files...");
+        for (const file of scannedFiles) {
+            await vectorRepo.deleteByFileId(file.fileId);
+        }
+        cleanSpinner.succeed("Old vectors removed");
+    }
 
     let embedProgress: ProgressBar | null = null;
     let embeddedCount = 0;
@@ -100,15 +157,14 @@ export const handleScan = async (flags: ScanFlags = {}) => {
                 embedProgress?.increment();
             },
             onDrain(stats) {
-                // Queue fully drained — embedding complete
+                // Queue fully drained
             },
         },
     });
 
-    // Chunk all files and push to queue
     const tasks = scannedFiles.map(file => {
         const chunks = chunkText(file.content);
-        const fileName = file.name.replace(/\.[^.]+$/, ""); // strip extension
+        const fileName = file.name.replace(/\.[^.]+$/, "");
         return {
             fileId: file.fileId,
             path: file.path,
@@ -129,10 +185,7 @@ export const handleScan = async (flags: ScanFlags = {}) => {
 
     const embedStart = Date.now();
 
-    // Push all tasks — queue processes with controlled concurrency
     queue.pushAll(tasks);
-
-    // Wait for all embeddings to complete
     const queueStats = await queue.drain();
     const embedDuration = ((Date.now() - embedStart) / 1000).toFixed(1);
 
@@ -142,10 +195,14 @@ export const handleScan = async (flags: ScanFlags = {}) => {
     const totalDuration = ((Date.now() - scanStart) / 1000).toFixed(1);
 
     console.log();
-    console.log(`  ${icons.sparkle} ${success("Scan complete")}${flags.fresh ? dim(" (fresh)") : ""}`);
+    console.log(`  ${icons.sparkle} ${success("Scan complete")}${flags.fresh ? dim(" (fresh)") : dim(" (incremental)")}`);
 
     summaryBox([
         { label: "Files discovered:", value: totalDiscovered,                     icon: icons.file },
+        { label: "New files:",        value: phaseStats?.newFiles ?? 0,           icon: icons.sparkle },
+        { label: "Changed files:",    value: phaseStats?.changedFiles ?? 0,       icon: icons.bolt },
+        { label: "Unchanged:",        value: phaseStats?.unchangedFiles ?? 0,     icon: icons.skip },
+        { label: "Deleted:",          value: deletedFileIds.length,               icon: deletedFileIds.length > 0 ? icons.warn : icons.check },
         { label: "Files embedded:",   value: embeddedCount,                       icon: icons.embed },
         { label: "Total chunks:",     value: totalChunks,                         icon: icons.chunk },
         { label: "Errors:",           value: embedErrorCount,                     icon: embedErrorCount > 0 ? icons.warn : icons.check },
@@ -153,6 +210,5 @@ export const handleScan = async (flags: ScanFlags = {}) => {
         { label: "Embed phase:",      value: `${embedDuration}s`,                 icon: icons.bolt },
         { label: "Total time:",       value: `${totalDuration}s`,                 icon: icons.rocket },
         { label: "Avg/chunk:",        value: `${queueStats.avgChunkLatencyMs.toFixed(0)}ms`, icon: icons.gear },
-        { label: "Batches sent:",     value: queueStats.totalBatchesSent,         icon: icons.vector },
     ]);
 };
